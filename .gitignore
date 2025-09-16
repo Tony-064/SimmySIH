@@ -1,0 +1,28 @@
+# Root gitignore for project
+
+# Node
+node_modules/
+**/node_modules/
+
+# Build artifacts
+build/
+**/build/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files (do not commit secrets)
+.env
+*.env
+**/.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# OS files
+.DS_Store
+Thumbs.db
