@@ -1,0 +1,9 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-cover bg-center min-h-screen flex justify-center items-center;
+  background-image: url('https://images.unsplash.com/photo-1588776814546-1c8ab02aa39b'); /* Soft healthcare stock image */
+}
