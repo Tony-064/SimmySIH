@@ -1,7 +1,6 @@
-
-# Simple Flask backend for Gemini AI answers
+# Flask backend that serves React build and exposes API endpoints (including /chat)
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, send_from_directory, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
 import google.generativeai as genai
@@ -10,22 +9,44 @@ import google.generativeai as genai
 load_dotenv()
 
 # Configure Gemini with API key
-api_key = os.getenv('GEMINI_API_KEY')
+api_key = os.getenv("GEMINI_API_KEY")
 if not api_key:
     raise ValueError("GEMINI_API_KEY not found in environment variables")
+
 genai.configure(api_key=api_key)
 
-app = Flask(__name__)
-CORS(app)
+# Paths
+BASE_DIR = os.path.dirname(__file__)
+BUILD_DIR = os.path.join(BASE_DIR, "build")  # build lives next to this backend.py
 
-@app.route('/chat', methods=['POST'])
+# Serve static assets from React build
+app = Flask(__name__, static_folder=BUILD_DIR, static_url_path="/")
+# In production, set FRONTEND_URL to your deployed frontend origin to restrict CORS
+CORS(app, origins=os.environ.get("FRONTEND_URL", "*"))  # Same service serves API + static
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret")
+
+
+# Health check
+@app.route("/api/health")
+def health():
+    return jsonify({"ok": True})
+
+
+# Example API endpoint
+@app.route("/api/echo", methods=["POST"])
+def echo():
+    data = request.get_json() or {}
+    return jsonify({"you_sent": data})
+
+
+# Chat endpoint using Gemini
+@app.route("/chat", methods=["POST"])
 def chat():
     try:
-        user_message = request.json.get('query')
+        user_message = request.json.get("query")
         if not user_message:
             return jsonify({"response": "No message received"}), 400
 
-        # Prompt the model to return structured sections
         system_prompt = (
             "You are a public health assistant. When the user asks about a disease, symptoms, or treatment, "
             "respond in clear sections as HTML with headings and lists. Sections must include: "
@@ -34,11 +55,10 @@ def chat():
             "Bold key terms with <strong>. Do not add outer html/body tags."
         )
 
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel("gemini-1.5-flash")
         response = model.generate_content(f"{system_prompt}\n\nUser: {user_message}")
         answer_text = response.text or "Sorry, I couldn't get an answer."
 
-        # Wrap with minimal style hints for badges similar to screenshots
         html = f'''
         <div style="line-height:1.6;">
           {answer_text}
@@ -54,8 +74,17 @@ def chat():
     except Exception as e:
         return jsonify({"response": f"Error: {str(e)}"}), 500
 
-if __name__ == '__main__':
-    app.run(debug=True)
+
+# Serve React app for all other routes (supports client-side routing)
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve_react(path):
+    file_path = os.path.join(BUILD_DIR, path)
+    if path and os.path.exists(file_path):
+        return send_from_directory(BUILD_DIR, path)
+    return send_from_directory(BUILD_DIR, "index.html")
 
 
-
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
