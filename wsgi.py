@@ -119,17 +119,25 @@ def format_health_response(response_text):
 @app.route('/chat', methods=['POST'])
 def chat():
     try:
+        # Validate request data
+        if not request.is_json:
+            return jsonify({"response": "Request must be JSON", "error": "Invalid content type"}), 400
+            
         user_message = request.json.get('query')
         if not user_message:
-            return jsonify({"response": "No message received"}), 400
+            return jsonify({"response": "No message received", "error": "Missing query"}), 400
         
+        # Check if API key is available
+        if not api_key:
+            return jsonify({"response": "API key not configured", "error": "Missing API key"}), 500
+            
         # Check if the query is health-related
         if not is_health_related(user_message):
             return jsonify({
                 "response": "I am a healthcare assistant. I can only help you with health-related questions. Please ask me about medical conditions, symptoms, treatments, or general health advice."
             }), 200
             
-        # Create a concise medical prompt
+        # Create a concise medical prompt with error handling guidance
         prompt = f"""As a medical expert, provide brief, clear information about {user_message}. Structure your response with these sections:
 
         Causes:
@@ -150,7 +158,9 @@ def chat():
         Note:
         - Brief medical disclaimer
 
-        Keep each point concise and focused. Use simple language. For serious conditions, emphasize the importance of medical care."""
+        Keep each point concise and focused. Use simple language. For serious conditions, emphasize the importance of medical care.
+        
+        If you cannot provide accurate information about this condition, respond with 'NO_INFORMATION' and I will handle the error appropriately."""
 
         # Prepare request to Gemini API
         headers = {
@@ -166,28 +176,70 @@ def chat():
             }]
         }
         
-        # Make request to Gemini API
-        response = requests.post(
-            GEMINI_API_ENDPOINT,
-            headers=headers,
-            json=data
-        )
+        # Make request to Gemini API with timeout and error handling
+        try:
+            response = requests.post(
+                GEMINI_API_ENDPOINT,
+                headers=headers,
+                json=data,
+                timeout=10  # 10 second timeout
+            )
+        except requests.exceptions.Timeout:
+            print("API request timed out")
+            return jsonify({
+                "response": "The request took too long to process. Please try again.",
+                "error": "Request timeout"
+            }), 504
+        except requests.exceptions.RequestException as e:
+            print(f"API request failed: {str(e)}")
+            return jsonify({
+                "response": "There was a problem connecting to the AI service. Please try again.",
+                "error": str(e)
+            }), 503
+            
+        # Print response details for debugging
+        print(f"API Response Status: {response.status_code}")
+        print(f"API Response Headers: {response.headers}")
+        print(f"API Response Content: {response.text[:500]}...")  # First 500 chars
         
         if response.status_code != 200:
-            print(f"Gemini API error: {response.status_code} - {response.text}")
+            error_message = f"Gemini API error: {response.status_code}"
+            try:
+                error_details = response.json()
+                error_message += f" - {error_details.get('error', {}).get('message', 'Unknown error')}"
+            except:
+                error_message += f" - {response.text}"
+            print(error_message)
             return jsonify({
                 "response": "Sorry, there was an error getting a response from the AI.",
-                "error": f"API Error {response.status_code}"
+                "error": error_message
+            }), 500
+        
+        # Parse response
+        try:
+            response_data = response.json()
+        except ValueError as e:
+            print(f"Failed to parse JSON response: {str(e)}")
+            return jsonify({
+                "response": "Received invalid response from the AI service.",
+                "error": "Invalid JSON response"
             }), 500
             
-        # Extract and format answer from response
-        response_data = response.json()
-        raw_answer = response_data.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', "")
-        
-        if not raw_answer:
+        if not response_data.get('candidates'):
+            print("No candidates in response")
             return jsonify({
-                "response": "Sorry, I couldn't generate a response. Please try rephrasing your question."
+                "response": "Sorry, I couldn't generate a response. Please try rephrasing your question.",
+                "error": "No response candidates"
             }), 500
+        
+        raw_answer = response_data['candidates'][0].get('content', {}).get('parts', [{}])[0].get('text', "")
+        
+        if not raw_answer or raw_answer == "NO_INFORMATION":
+            print("Empty or NO_INFORMATION response")
+            return jsonify({
+                "response": "I apologize, but I don't have enough accurate information about this specific condition. Please try asking about a different health topic or consult a healthcare professional.",
+                "error": "No information available"
+            }), 404
             
         # Format the response as HTML
         formatted_html = format_health_response(raw_answer)
