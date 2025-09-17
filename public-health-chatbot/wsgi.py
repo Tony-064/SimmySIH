@@ -1,21 +1,22 @@
 from flask import Flask, send_from_directory
 import os
 
+# Flask app, pointing to React build
 app = Flask(__name__, static_folder="static", static_url_path="")
 
-# Serve React build
+# Serve React index.html at root
 @app.route("/")
-def index():
+def serve_index():
     return send_from_directory(app.static_folder, "index.html")
 
-# React Router fallback
+# Serve React Router paths (fallback to index.html)
 @app.errorhandler(404)
 def not_found(e):
     return send_from_directory(app.static_folder, "index.html")
 
-# Health check (Render uses this sometimes)
+# Optional: health check route (Render pings this)
 @app.route("/health")
-def health():
+def health_check():
     return {"status": "ok"}
 
 if __name__ == "__main__":
