@@ -17,7 +17,7 @@ if not api_key:
     raise ValueError("GEMINI_API_KEY not found in environment variables")
 
 # Configure Gemini API endpoint
-GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent"
+GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
 # Chat endpoint
 @app.route('/chat', methods=['POST'])
@@ -30,7 +30,7 @@ def chat():
         # Prepare request to Gemini API
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}"
+            "X-goog-api-key": api_key
         }
         
         data = {
