@@ -27,9 +27,8 @@ def chat():
         if not user_message:
             return jsonify({"response": "No message received"}), 400
             
-        # Create model instance and generate response
-        model = genai.GenerativeModel('gemini-pro')
-        response = model.generate_content(user_message)
+        # Generate response directly using the API
+        response = genai.generate_content(user_message)
         answer = response.text if response.text else "Sorry, I couldn't get an answer."
     except Exception as e:
         answer = f"Error: {str(e)}"
