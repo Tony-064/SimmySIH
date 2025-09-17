@@ -1,10 +1,4 @@
 from flask import Flask, send_from_directory, request, jsonify
-api_key = os.getenv('GEMINI_API_KEY')
-if not api_key:
-    raise ValueError("GEMINI_API_KEY not found in environment variables")
-
-# Configure Gemini API endpoint
-GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent"send_from_directory, request, jsonify
 from flask_cors import CORS
 import os
 import requests
@@ -17,19 +11,13 @@ load_dotenv()
 app = Flask(__name__, static_folder="static", static_url_path="")
 CORS(app)
 
-# Configure Gemini
+# Get API key
 api_key = os.getenv('GEMINI_API_KEY')
 if not api_key:
     raise ValueError("GEMINI_API_KEY not found in environment variables")
 
-# Initialize Gemini with API key and correct version
-genai.configure(
-    api_key=api_key,
-    client_options={
-        "api_endpoint": "https://generativelanguage.googleapis.com",
-        "universe_domain": "googleapis.com"
-    }
-)
+# Configure Gemini API endpoint
+GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent"
 
 # Chat endpoint
 @app.route('/chat', methods=['POST'])
