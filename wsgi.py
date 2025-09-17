@@ -74,7 +74,8 @@ def format_health_response(response_text):
         "Home Care": {"color": "text-blue-600", "important": False, "items": []},
         "Medications": {"color": "text-blue-600", "important": False, "items": []},
         "⚠️ Warning Signs": {"color": "text-red-600", "important": True, "items": []},
-        "Note": {"color": "text-blue-600", "important": False, "items": []}
+        "Note": {"color": "text-blue-600", "important": False, "items": []},
+        "Disclaimer": {"color": "text-blue-600", "important": False, "items": []}
     }
     
     current_section = None
@@ -234,59 +235,58 @@ def chat():
         print(f"API Response Content: {response.text[:500]}...")  # First 500 chars
         
         # Check response status and parse response
-        try:
-            print("\nParsing API response...")
-            
-            if response.status_code != 200:
-                error_message = f"Gemini API error: {response.status_code}"
-                try:
-                    error_details = response.json()
-                    api_error = error_details.get('error', {})
-                    error_message = f"API Error: {api_error.get('message', 'Unknown error')}"
-                    error_code = api_error.get('code', 500)
-                    print(f"ERROR: {error_message}")
-                    print(f"Full error details: {json.dumps(error_details, indent=2)}")
-                    
-                    if error_code == 400:
-                        return jsonify({
-                            "response": "The request was invalid. This might be a temporary issue.",
-                            "error": error_message
-                        }), 400
-                    elif error_code == 401:
-                        return jsonify({
-                            "response": "API authentication failed. Please check the system configuration.",
-                            "error": "Authentication error"
-                        }), 401
-                    elif error_code == 429:
-                        return jsonify({
-                            "response": "The AI service is currently busy. Please try again in a moment.",
-                            "error": "Rate limit exceeded"
-                        }), 429
-                    else:
-                        return jsonify({
-                            "response": "Sorry, there was an error getting a response from the AI.",
-                            "error": error_message
-                        }), error_code or 500
-                        
-                except json.JSONDecodeError:
-                    print(f"ERROR: Non-JSON error response: {response.text[:200]}...")
-                    return jsonify({
-                        "response": "The AI service returned an unexpected response format.",
-                        "error": f"HTTP {response.status_code}: {response.text[:100]}"
-                    }), 500
-            
-            # Parse successful response
+        print("\nParsing API response...")
+        
+        if response.status_code != 200:
+            error_message = f"Gemini API error: {response.status_code}"
             try:
-                response_data = response.json()
-                print("Successfully parsed JSON response")
-            except json.JSONDecodeError as e:
-                print(f"ERROR: Failed to parse JSON response: {str(e)}")
-                print(f"Response content: {response.text[:200]}...")
+                error_details = response.json()
+                api_error = error_details.get('error', {})
+                error_message = f"API Error: {api_error.get('message', 'Unknown error')}"
+                error_code = api_error.get('code', 500)
+                print(f"ERROR: {error_message}")
+                print(f"Full error details: {json.dumps(error_details, indent=2)}")
+                
+                if error_code == 400:
+                    return jsonify({
+                        "response": "The request was invalid. This might be a temporary issue.",
+                        "error": error_message
+                    }), 400
+                elif error_code == 401:
+                    return jsonify({
+                        "response": "API authentication failed. Please check the system configuration.",
+                        "error": "Authentication error"
+                    }), 401
+                elif error_code == 429:
+                    return jsonify({
+                        "response": "The AI service is currently busy. Please try again in a moment.",
+                        "error": "Rate limit exceeded"
+                    }), 429
+                else:
+                    return jsonify({
+                        "response": "Sorry, there was an error getting a response from the AI.",
+                        "error": error_message
+                    }), error_code or 500
+                    
+            except json.JSONDecodeError:
+                print(f"ERROR: Non-JSON error response: {response.text[:200]}...")
                 return jsonify({
-                    "response": "Received invalid response from the AI service.",
-                    "error": "Invalid JSON response"
+                    "response": "The AI service returned an unexpected response format.",
+                    "error": f"HTTP {response.status_code}: {response.text[:100]}"
                 }), 500
-            
+        
+        # Parse successful response
+        try:
+            response_data = response.json()
+            print("Successfully parsed JSON response")
+        except json.JSONDecodeError as e:
+            print(f"ERROR: Failed to parse JSON response: {str(e)}")
+            print(f"Response content: {response.text[:200]}...")
+            return jsonify({
+                "response": "Received invalid response from the AI service.",
+                "error": "Invalid JSON response"
+            }), 500
+        
         if not response_data.get('candidates'):
             print("No candidates in response")
             return jsonify({
