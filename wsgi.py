@@ -59,12 +59,12 @@ def is_health_related(query):
 
 def format_health_response(response_text):
     sections = {
-        "Possible Causes": {"color": "bg-red-500", "items": []},
-        "Prevention": {"color": "bg-blue-500", "items": []},
-        "Home Remedies": {"color": "bg-green-500", "items": []},
-        "Basic Medications": {"color": "bg-purple-500", "items": []},
-        "When to See a Doctor": {"color": "bg-yellow-500", "items": []},
-        "Disclaimer": {"color": "bg-gray-500", "items": []}
+        "⚠️ Causes": {"color": "text-red-600", "important": True, "items": []},
+        "Prevention": {"color": "text-blue-600", "important": False, "items": []},
+        "Home Care": {"color": "text-blue-600", "important": False, "items": []},
+        "Medications": {"color": "text-blue-600", "important": False, "items": []},
+        "⚠️ Warning Signs": {"color": "text-red-600", "important": True, "items": []},
+        "Note": {"color": "text-blue-600", "important": False, "items": []}
     }
     
     current_section = None
@@ -77,7 +77,11 @@ def format_health_response(response_text):
             
         # Check if this is a section header (more flexible matching)
         for section in sections.keys():
-            if section.lower() in line.lower():
+            if any(s.lower() in line.lower() for s in [
+                "cause" if section == "⚠️ Causes" else
+                "warning" if section == "⚠️ Warning Signs" else
+                section.lower()
+            ]):
                 current_section = section
                 break
         else:
@@ -85,22 +89,22 @@ def format_health_response(response_text):
             if current_section and line:
                 # Clean up bullet points and formatting
                 line = line.lstrip('•-*').strip()
-                if line:
+                if line and len(line) > 3:  # Skip very short lines
                     sections[current_section]["items"].append(line)
     
     # Format the response as HTML with Tailwind CSS classes
     html_parts = []
     for section, data in sections.items():
         if data["items"]:
-            # Section header with colorful background
-            html_parts.append(f'<div class="mb-4">')
-            html_parts.append(f'<h3 class="text-white font-bold py-2 px-4 rounded-lg {data["color"]} mb-2">{section}</h3>')
-            # Section content
-            html_parts.append('<ul class="space-y-2 pl-4">')
+            # Section header with colored text
+            html_parts.append(f'<div class="mb-3">')  # Reduced margin
+            html_parts.append(f'<h3 class="font-bold {data["color"]} text-lg mb-1">{section}</h3>')  # Colored text
+            # Section content - more compact
+            html_parts.append('<ul class="space-y-1 pl-3">')  # Reduced spacing and padding
             for item in data["items"]:
-                html_parts.append(f'<li class="flex items-start">')
-                html_parts.append(f'<span class="text-gray-600 mr-2">•</span>')
-                html_parts.append(f'<span class="text-gray-800">{item}</span>')
+                html_parts.append(f'<li class="flex items-start text-sm">')  # Smaller text
+                html_parts.append(f'<span class="mr-1">•</span>')  # Smaller bullet margin
+                html_parts.append(f'<span>{item}</span>')
                 html_parts.append('</li>')
             html_parts.append('</ul>')
             html_parts.append('</div>')
@@ -125,38 +129,28 @@ def chat():
                 "response": "I am a healthcare assistant. I can only help you with health-related questions. Please ask me about medical conditions, symptoms, treatments, or general health advice."
             }), 200
             
-        # Create a comprehensive medical prompt
-        prompt = f"""As a medical expert, provide detailed information about {user_message}. If this is a disease or medical condition, include:
+        # Create a concise medical prompt
+        prompt = f"""As a medical expert, provide brief, clear information about {user_message}. Structure your response with these sections:
 
-        Possible Causes:
-        - List the main causes and risk factors
-        - Explain how it spreads or develops
+        Causes:
+        - List only the most common causes (2-3 points)
         
         Prevention:
-        - List specific preventive measures
-        - Include lifestyle recommendations
-        - Mention any available vaccines
+        - Key preventive measures (2-3 points)
         
-        Home Remedies:
-        - Safe home care methods
-        - Dietary recommendations
-        - Lifestyle adjustments
+        Home Care:
+        - Essential self-care tips (2-3 points)
         
-        Basic Medications:
-        - Common treatment approaches
-        - Types of medications typically prescribed
-        - Important medication precautions
+        Medications:
+        - Main treatment approaches (1-2 points)
         
-        When to See a Doctor:
-        - Warning signs and symptoms
-        - Emergency symptoms
-        - High-risk situations
+        Warning Signs:
+        - Critical symptoms requiring medical attention (2-3 points)
         
-        Disclaimer:
-        - Include standard medical disclaimer
-        - Emphasize importance of professional medical advice
+        Note:
+        - Brief medical disclaimer
 
-        Keep the information accurate, evidence-based, and easy to understand. If this is a serious condition, emphasize the importance of seeking professional medical care."""
+        Keep each point concise and focused. Use simple language. For serious conditions, emphasize the importance of medical care."""
 
         # Prepare request to Gemini API
         headers = {
