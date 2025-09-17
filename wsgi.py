@@ -1,7 +1,13 @@
-from flask import Flask, send_from_directory, request, jsonify
+from flask im# Get API key
+api_key = os.getenv('GEMINI_API_KEY')
+if not api_key:
+    raise ValueError("GEMINI_API_KEY not found in environment variables")
+
+# Configure Gemini API endpoint
+GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1/models/gemini-1.0-pro:generateContent"send_from_directory, request, jsonify
 from flask_cors import CORS
 import os
-import google.generativeai as genai
+import requests
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -33,16 +39,45 @@ def chat():
         if not user_message:
             return jsonify({"response": "No message received"}), 400
             
-        # Create model instance and generate response
-        model = genai.GenerativeModel("gemini-1.0-pro")
-        response = model.generate_content(user_message)
-        answer = response.text if response.text else "Sorry, I couldn't get an answer."
+        # Prepare request to Gemini API
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        }
+        
+        data = {
+            "contents": [{
+                "parts": [{
+                    "text": user_message
+                }]
+            }]
+        }
+        
+        # Make request to Gemini API
+        response = requests.post(
+            GEMINI_API_ENDPOINT,
+            headers=headers,
+            json=data
+        )
+        
+        if response.status_code != 200:
+            print(f"Gemini API error: {response.status_code} - {response.text}")
+            return jsonify({
+                "response": "Sorry, there was an error getting a response from the AI.",
+                "error": f"API Error {response.status_code}"
+            }), 500
+            
+        # Extract answer from response
+        response_data = response.json()
+        answer = response_data.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', "Sorry, I couldn't get an answer.")
+        
     except Exception as e:
         print(f"Error in chat endpoint: {str(e)}")
         return jsonify({
             "response": "Sorry, there was an error processing your request. Please try again.",
             "error": str(e)
         }), 500
+    
     return jsonify({"response": answer})
 
 # Serve React build
