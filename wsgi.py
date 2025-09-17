@@ -1,10 +1,10 @@
-from flask im# Get API key
+from flask import Flask, send_from_directory, request, jsonify
 api_key = os.getenv('GEMINI_API_KEY')
 if not api_key:
     raise ValueError("GEMINI_API_KEY not found in environment variables")
 
 # Configure Gemini API endpoint
-GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1/models/gemini-1.0-pro:generateContent"send_from_directory, request, jsonify
+GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent"send_from_directory, request, jsonify
 from flask_cors import CORS
 import os
 import requests
