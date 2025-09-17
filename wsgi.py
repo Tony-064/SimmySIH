@@ -42,17 +42,9 @@ def chat():
         model = genai.GenerativeModel(model_name='gemini-pro',
                                     generation_config=generation_config)
         
-        # Generate response with safety settings
-        safety_settings = {
-            "harassment": "block_none",
-            "hate_speech": "block_none",
-            "sexually_explicit": "block_none",
-            "dangerous_content": "block_none",
-        }
-        
+        # Generate response
         response = model.generate_content(
             contents=user_message,
-            safety_settings=safety_settings,
             stream=False
         )
         
