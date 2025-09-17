@@ -15,7 +15,12 @@ CORS(app)
 api_key = os.getenv('GEMINI_API_KEY')
 if not api_key:
     raise ValueError("GEMINI_API_KEY not found in environment variables")
-genai.configure(api_key=api_key)
+
+# Initialize Gemini with API key and defaults
+genai.configure(
+    api_key=api_key,
+    transport='rest'  # Ensure REST transport is used
+)
 
 # Chat endpoint
 @app.route('/chat', methods=['POST'])
@@ -25,9 +30,32 @@ def chat():
         if not user_message:
             return jsonify({"response": "No message received"}), 400
             
-        # Create model instance for each request
-        model = genai.GenerativeModel('gemini-pro')
-        response = model.generate_content(user_message)
+        # Configure generation parameters
+        generation_config = {
+            "temperature": 0.9,
+            "top_p": 1,
+            "top_k": 1,
+            "max_output_tokens": 2048,
+        }
+
+        # Create model instance with configuration
+        model = genai.GenerativeModel(model_name='gemini-pro',
+                                    generation_config=generation_config)
+        
+        # Generate response with safety settings
+        safety_settings = {
+            "harassment": "block_none",
+            "hate_speech": "block_none",
+            "sexually_explicit": "block_none",
+            "dangerous_content": "block_none",
+        }
+        
+        response = model.generate_content(
+            contents=user_message,
+            safety_settings=safety_settings,
+            stream=False
+        )
+        
         answer = response.text if response.text else "Sorry, I couldn't get an answer."
     except Exception as e:
         answer = f"Error: {str(e)}"
