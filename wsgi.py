@@ -1,6 +1,7 @@
 from flask import Flask, send_from_directory, request, jsonify
 from flask_cors import CORS
 import os
+import json
 import requests
 from dotenv import load_dotenv
 
@@ -11,10 +12,19 @@ load_dotenv()
 app = Flask(__name__, static_folder="static", static_url_path="")
 CORS(app)
 
-# Get API key
+# Get API key and validate
 api_key = os.getenv('GEMINI_API_KEY')
+print("API Key Status:", "Present" if api_key else "Missing")
+
 if not api_key:
+    print("ERROR: GEMINI_API_KEY not found in environment variables")
     raise ValueError("GEMINI_API_KEY not found in environment variables")
+
+# Verify API key format (basic check)
+if not api_key.startswith('AIza'):
+    print("WARNING: API key doesn't match expected format")
+    
+print("Initialization: API key validated")
 
 # Configure Gemini API endpoint
 GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
@@ -176,54 +186,106 @@ def chat():
             }]
         }
         
+        # Log request details (without API key)
+        print(f"\nRequest Details:")
+        print(f"Endpoint: {GEMINI_API_ENDPOINT}")
+        print(f"Request Data: {json.dumps(data, indent=2)}")
+        
         # Make request to Gemini API with timeout and error handling
         try:
+            print("\nMaking API request...")
             response = requests.post(
                 GEMINI_API_ENDPOINT,
                 headers=headers,
                 json=data,
-                timeout=10  # 10 second timeout
+                timeout=15  # Increased timeout to 15 seconds
             )
+            print(f"Response received. Status: {response.status_code}")
+            
         except requests.exceptions.Timeout:
-            print("API request timed out")
+            print("ERROR: API request timed out after 15 seconds")
             return jsonify({
-                "response": "The request took too long to process. Please try again.",
+                "response": "The AI service is taking too long to respond. Please try again in a moment.",
                 "error": "Request timeout"
             }), 504
+            
         except requests.exceptions.RequestException as e:
-            print(f"API request failed: {str(e)}")
-            return jsonify({
-                "response": "There was a problem connecting to the AI service. Please try again.",
-                "error": str(e)
-            }), 503
+            print(f"ERROR: API request failed: {str(e)}")
+            error_details = str(e)
+            if "Failed to establish a new connection" in error_details:
+                return jsonify({
+                    "response": "Unable to connect to the AI service. Please check your internet connection and try again.",
+                    "error": "Connection failed"
+                }), 503
+            elif "SSLError" in error_details:
+                return jsonify({
+                    "response": "Secure connection to the AI service failed. This might be a temporary issue.",
+                    "error": "SSL Error"
+                }), 503
+            else:
+                return jsonify({
+                    "response": "There was a problem connecting to the AI service. Please try again.",
+                    "error": error_details
+                }), 503
             
         # Print response details for debugging
         print(f"API Response Status: {response.status_code}")
         print(f"API Response Headers: {response.headers}")
         print(f"API Response Content: {response.text[:500]}...")  # First 500 chars
         
-        if response.status_code != 200:
-            error_message = f"Gemini API error: {response.status_code}"
-            try:
-                error_details = response.json()
-                error_message += f" - {error_details.get('error', {}).get('message', 'Unknown error')}"
-            except:
-                error_message += f" - {response.text}"
-            print(error_message)
-            return jsonify({
-                "response": "Sorry, there was an error getting a response from the AI.",
-                "error": error_message
-            }), 500
-        
-        # Parse response
+        # Check response status and parse response
         try:
-            response_data = response.json()
-        except ValueError as e:
-            print(f"Failed to parse JSON response: {str(e)}")
-            return jsonify({
-                "response": "Received invalid response from the AI service.",
-                "error": "Invalid JSON response"
-            }), 500
+            print("\nParsing API response...")
+            
+            if response.status_code != 200:
+                error_message = f"Gemini API error: {response.status_code}"
+                try:
+                    error_details = response.json()
+                    api_error = error_details.get('error', {})
+                    error_message = f"API Error: {api_error.get('message', 'Unknown error')}"
+                    error_code = api_error.get('code', 500)
+                    print(f"ERROR: {error_message}")
+                    print(f"Full error details: {json.dumps(error_details, indent=2)}")
+                    
+                    if error_code == 400:
+                        return jsonify({
+                            "response": "The request was invalid. This might be a temporary issue.",
+                            "error": error_message
+                        }), 400
+                    elif error_code == 401:
+                        return jsonify({
+                            "response": "API authentication failed. Please check the system configuration.",
+                            "error": "Authentication error"
+                        }), 401
+                    elif error_code == 429:
+                        return jsonify({
+                            "response": "The AI service is currently busy. Please try again in a moment.",
+                            "error": "Rate limit exceeded"
+                        }), 429
+                    else:
+                        return jsonify({
+                            "response": "Sorry, there was an error getting a response from the AI.",
+                            "error": error_message
+                        }), error_code or 500
+                        
+                except json.JSONDecodeError:
+                    print(f"ERROR: Non-JSON error response: {response.text[:200]}...")
+                    return jsonify({
+                        "response": "The AI service returned an unexpected response format.",
+                        "error": f"HTTP {response.status_code}: {response.text[:100]}"
+                    }), 500
+            
+            # Parse successful response
+            try:
+                response_data = response.json()
+                print("Successfully parsed JSON response")
+            except json.JSONDecodeError as e:
+                print(f"ERROR: Failed to parse JSON response: {str(e)}")
+                print(f"Response content: {response.text[:200]}...")
+                return jsonify({
+                    "response": "Received invalid response from the AI service.",
+                    "error": "Invalid JSON response"
+                }), 500
             
         if not response_data.get('candidates'):
             print("No candidates in response")
