@@ -16,8 +16,16 @@ api_key = os.getenv('GEMINI_API_KEY')
 if not api_key:
     raise ValueError("GEMINI_API_KEY not found in environment variables")
 
-# Initialize Gemini with API key
+# Initialize Gemini with API key and defaults
 genai.configure(api_key=api_key)
+
+# Set default parameters
+generation_config = {
+    "temperature": 0.9,
+    "top_p": 1,
+    "top_k": 1,
+    "max_output_tokens": 2048,
+}
 
 # Chat endpoint
 @app.route('/chat', methods=['POST'])
@@ -27,8 +35,9 @@ def chat():
         if not user_message:
             return jsonify({"response": "No message received"}), 400
             
-        # Generate response directly using the API
-        response = genai.generate_content(user_message)
+        # Create model instance and generate response
+        model = genai.GenerativeModel(model_name="gemini-pro")
+        response = model.generate_content(user_message)
         answer = response.text if response.text else "Sorry, I couldn't get an answer."
     except Exception as e:
         answer = f"Error: {str(e)}"
