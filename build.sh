@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # Install Python deps
 pip install -r requirements.txt
 
